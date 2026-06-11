@@ -4,6 +4,24 @@ import {User} from "../model/user.model.js"
 import {uploadOnCloudinary} from "../utils/cloudinary.js"
 import { ApiResponse } from "../utils/ApiResponse.js"
 
+//acces and refresh generate
+const generateAccessAndRefreshToken = async (userId) => {
+    try {
+        const user= await User.findById(userId)
+        const accessToken= user.generateAccessToken()
+        const refreshToken= user.generateRefreshToken()
+
+        user.refreshToken = refreshToken
+       await user.save({validateBeforeSave: false})
+
+        return {accessToken , refreshToken}
+
+    } catch (error) {
+        throw new ApiError(500, "Something wrong while genrating access and refresh token")
+    }
+    
+}
+
 const registerUser = asyncHandler(async (req,res) =>{
     //get user details from frontend
     //validation -- not empty
@@ -72,4 +90,90 @@ const registerUser = asyncHandler(async (req,res) =>{
     )
 })
 
-export {registerUser}
+const loginUser = asyncHandler(async (req,res) =>{
+    //data from user, username&password
+    //check username or email is existed or not 
+    //check user is exists or not 
+    //check password
+    //access and refresh token generate
+    //send token in cookies
+
+    //take data from body
+    const {username, email, password} = req.body
+    if (!username || !email) {
+        throw new ApiError(400, "username or email is required")
+    }
+
+    //find the user in db
+    const user= await User.findOne({
+        $or: [{username}, {email}]
+    })
+    if (!user) {
+        throw new ApiError(404, "user is not exits")
+    }
+
+    //password check
+    const isValidPassword = await user.isPasswordCorrect(password)
+    if (!isValidPassword) {
+        throw new ApiError(404, "Invalid user credentials")
+    }
+
+    //generate token
+    const {accessToken, refreshToken}= await generateAccessAndRefreshToken(user._id)
+
+    //.select is gives us,  which fiels we don't want to send.
+    const loggedInUser= await User.findById(user._id).select("-password -refreshToken")
+
+    //optins object gives our cookies secure, 
+    //after these fields cookies only modified by server not ant frontend or etc.
+    const options= {
+        httpOnly: true,
+        secure: true
+    }
+
+    //send response 
+    return res
+    .status(200)
+    .cookie("accessToken", accessToken, options)
+    .cookie("refreshToken", refreshToken, options)
+    .json(
+        new ApiResponse(
+            200,
+            {
+                user: loggedInUser, accessToken, refreshToken
+            },
+            "User Logged In Successfully"
+        )
+    )
+})
+
+const logoutUser = asyncHandler(async (req,res) => {
+    await User.findByIdAndUpdate( //it remove token from db
+        req.user._id,
+        {
+            $set: { //set operator set the value
+                refreshToken: undefined
+            }
+        },
+        {
+            new: true //it gives updated value
+        }
+    )
+    const options = {
+        httpOnly: true,
+        secure: true
+    }
+
+    //clear cookie also
+    return res
+    .status(200)
+    .clearcookie("accessToken", options)
+    .clearcookie("refreshToken", options)
+    .json(new ApiResponse(200, {}, "user logout successfully"))
+})
+
+export {
+    registerUser,
+    loginUser,
+    logoutUser
+}
