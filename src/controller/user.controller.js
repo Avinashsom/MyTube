@@ -25,7 +25,7 @@ const registerUser = asyncHandler(async (req,res) =>{
         throw new ApiError(400, "All field are required")
     }
 
-    const existedUser= User.findOne({
+    const existedUser= await User.findOne({
         $or: [{username}, {email}]  // $or operator is help to find same email and username
     })
     if (existedUser) {
@@ -33,17 +33,17 @@ const registerUser = asyncHandler(async (req,res) =>{
     }
     
     //upload middlewear give the more field i response, check avatar and image
-    const avatarLocalPath= req.files?.avatar[0]?.path;
-    const coverImageLocalPath= req.files?.coverImage[0]?.path;
+    const avatarLocalPath= req.files?.avatar?.[0]?.path;
+    const coverImageLocalPath= req.files?.coverImage?.[0]?.path;
     if (!avatarLocalPath) {
-        throw new ApiError(400, "avatar is required")
+        throw new ApiError(400, "avatar is required multer")
     }
 
     //upload images on cloudinary 
     const avatar= await uploadOnCloudinary(avatarLocalPath)
     const coverImage= await uploadOnCloudinary(coverImageLocalPath)
     if (!avatar) {
-        throw new ApiError(400, "avatar is required")
+        throw new ApiError(400, "avatar is required cloudiary")
     }
 
     //create and enter in db
