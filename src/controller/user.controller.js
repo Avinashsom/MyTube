@@ -3,6 +3,8 @@ import {ApiError} from "../utils/ApiError.js"
 import {User} from "../model/user.model.js"
 import {uploadOnCloudinary} from "../utils/cloudinary.js"
 import { ApiResponse } from "../utils/ApiResponse.js"
+import jwt from "jsonwebtoken";
+
 
 //acces and refresh generate
 const generateAccessAndRefreshToken = async (userId) => {
@@ -33,6 +35,7 @@ const registerUser = asyncHandler(async (req,res) =>{
     //check user creation
     //return res
 
+    //get details from frontend
     const{fullName, email, username, password} = req.body
     console.log("email:", email);
 
@@ -50,7 +53,7 @@ const registerUser = asyncHandler(async (req,res) =>{
         throw new ApiError(400, "user with email and username already exists")
     }
     
-    //upload middlewear give the more field i response, check avatar and image
+    //upload middlewear give the more field in response, check avatar and image
     const avatarLocalPath= req.files?.avatar?.[0]?.path;
     const coverImageLocalPath= req.files?.coverImage?.[0]?.path;
     if (!avatarLocalPath) {
@@ -100,7 +103,7 @@ const loginUser = asyncHandler(async (req,res) =>{
 
     //take data from body
     const {username, email, password} = req.body
-    if (!username || !email) {
+    if (!username && !email) {
         throw new ApiError(400, "username or email is required")
     }
 
@@ -149,7 +152,7 @@ const loginUser = asyncHandler(async (req,res) =>{
 
 const logoutUser = asyncHandler(async (req,res) => {
     await User.findByIdAndUpdate( //it remove token from db
-        req.user._id,
+        req.user._id, //we find user id by help of verifyJWT middleare. and embedded user in req
         {
             $set: { //set operator set the value
                 refreshToken: undefined
@@ -165,15 +168,69 @@ const logoutUser = asyncHandler(async (req,res) => {
     }
 
     //clear cookie also
-    return res
-    .status(200)
-    .clearcookie("accessToken", options)
-    .clearcookie("refreshToken", options)
+    return res.status(200)
+    .clearCookie("accessToken", options)
+    .clearCookie("refreshToken", options)
     .json(new ApiResponse(200, {}, "user logout successfully"))
+})
+
+const refreshAccessToken = asyncHandler(async (req,res) => {
+    //after expiry accesstoken we login user without take username&email from user
+    //by the help of refreshToken
+
+    //take refreshToken from cookie
+    const incomingRefreshToken= req.cookies.refreshToken || req.body.refreshToken
+    if (!incomingRefreshToken) {
+        throw new ApiError(400, "unauthorized access")
+    }
+
+    try {
+        //incomingRefreshToken verify by help of jwt with the which store in db.
+        const decodeToken= jwt.verify(
+            incomingRefreshToken , process.env.REFRESH_TOKEN_SECRET
+        )
+        if (!decodeToken) {
+            throw new ApiError(400, "Invalid refresh token")
+        }
+    
+        //find user from db by help of token
+        const user= await User.findById(decodeToken?._id)
+        if(!user){
+            throw new ApiError(400, "Invalid user token")
+        }
+    
+        //if user exists, check the incomingRefreshToken  and  user.refreshToken,
+        //because user also store refreshToken in db if it exists give access
+        if (incomingRefreshToken !== user.refreshToken) {
+            throw new ApiError(400, "Invalid user")
+        }
+    
+        //generate both token 
+        const {accessToken, newRefreshToken} = await generateAccessAndRefreshToken(user._id)
+    
+        const options = {
+            httpOnly: true,
+            secure: true
+        }
+    
+        //send res 
+        return res
+        .status(200)
+        .cookie("accessToken", accessToken, options)
+        .cookie("refreshToken", newRefreshToken, options)
+        .json(
+            200,
+            {accessToken, refreshToken: newRefreshToken},
+            "Access token refreshed"
+        )
+    } catch (error) {
+        throw new ApiError(400, error?.message || "Token not valid")
+    }
 })
 
 export {
     registerUser,
     loginUser,
-    logoutUser
+    logoutUser,
+    refreshAccessToken
 }

@@ -1,7 +1,7 @@
-import { ApiError } from "../utils/ApiError";
-import { asyncHandler } from "../utils/asyncHandler";
+import { ApiError } from "../utils/ApiError.js";
+import { asyncHandler } from "../utils/asyncHandler.js";
 import jwt from "jsonwebtoken";
-import { User } from "../model/user.model";
+import { User } from "../model/user.model.js";
 
 //it find user is authenticate or not 
 export const verifyJWT = asyncHandler(async (req, _, next) => {
@@ -14,13 +14,13 @@ export const verifyJWT = asyncHandler(async (req, _, next) => {
         //verify by jwt 
         const decodeToken= jwt.verify(token, process.env.ACCESS_TOKEN_SECRET)
         //from all these 3 step is only to find user which one is it for eg(logout)
-        const user= await User.findById(decode?._id).select("-password -refreshToken")
+        const user= await User.findById(decodeToken?._id).select("-password -refreshToken")
         if(!user){
             throw new ApiError(401,"Invalid access token")
         }
 
         req.user= user
-        next
+        next()
     } catch (error) {
         throw new ApiError(400, error?.message || "Invalid token")
     }
