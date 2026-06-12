@@ -350,6 +350,93 @@ const updateUserCoverImage = asyncHandler(async (req,res) => {
     ))
 })
 
+const getUserChannelProfile = asyncHandler(async (req, res) => {
+    //we count subcriber and how many i subscribed
+    //we take username from the req params
+    const {username}= req.params
+    if (!username?.trim()) {
+        throw new ApiError(400, "username is required")
+    }
+
+    //next find user and join with subcriber and channeltosubcribed
+    //by help of monogodb aggregate pipelines
+    //we join the 2 models subscribed and user, because subscriber is also a user
+
+    const channel = await User.aggregate([
+        {
+            //it can find user which match username, actually done work User.findOne
+            $match: {
+                username: username?.toLowerCase()
+            }
+        },
+        {
+            //it can find all documents in which store all subcribers of channel
+            $lookup: {
+                from: "subscriptions",
+                localField: "_id",
+                foreignField: "channel",
+                as: "subscribers"
+            }
+        },
+        {
+            //find all doc, how many channel i subscribed
+            $lookup: {
+                from: "subscriptions",
+                localField: "_id",
+                foreignField: "subscriber",
+                as: "subscribedTo"
+            }
+        },
+        {
+            //add a field in user model subcribers count 
+            // and other join
+            $addFields:{
+                subsciberCount: {
+                    $size : "subscribers"
+                },
+                channelSubsriberToCount: {
+                    $size: "subscribedTo"
+                },
+                //now it return t/f is i subscribed this channel or not
+                isSubscribed: {
+                    $cond:{// it gives to implement conditions
+                        if: {$in: [req.user?._id, "$subscribers.subscriber"]},//in-- serach in array and object both
+                        then: true, 
+                        else: false
+                    }
+                }
+            }
+        },
+        {
+            //it gives only selected details when demand
+            $project:{
+                fullName: 1,
+                username:1,
+                email:1,
+                avatar:1,
+                coverImage:1,
+                subsciberCount:1,
+                channelSubsriberToCount:1,
+                isSubscribed:1
+            }
+        }
+    ])
+
+    if(!channel?.length){
+        throw new ApiError(404, "channel not exists")
+    }
+
+    return res
+    .status(200)
+    .json(
+        new ApiResponse(
+            200,
+            channel[0],
+            "channel profile fetched successfully"
+        )
+    )
+})
+
 export {
     registerUser,
     loginUser,
@@ -359,5 +446,6 @@ export {
     getCurrentUser,
     updateAccountDetails,
     updateUserAvatar,
-    updateUserCoverImage
+    updateUserCoverImage,
+    getUserChannelProfile
 }
