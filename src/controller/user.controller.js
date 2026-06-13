@@ -155,8 +155,8 @@ const logoutUser = asyncHandler(async (req,res) => {
     await User.findByIdAndUpdate( //it remove token from db
         req.user._id, //we find user id by help of verifyJWT middleare. and embedded user in req
         {
-            $set: { //set operator set the value
-                refreshToken: undefined
+            $unset: { //set operator set the value
+                refreshToken: 1
             }
         },
         {
