@@ -36,6 +36,54 @@ const getVideoComments = asyncHandler(async (req, res) => {
 
 const addComment = asyncHandler(async (req, res) => {
     // TODO: add a comment to a video
+    //get video from req.params and comment from req.body
+    //create a new comment with commentText, videoId and userId
+    //save comment in db
+    //return res with created comment
+
+    const {videoId}= req.params
+    if(!videoId){
+        throw new ApiError(400, "video url is not valid")
+    }
+
+    const {commentText} = req.body
+    if(!commentText){
+        throw new ApiError(400, "commentText is required")
+    }
+
+    //we also create a new comment by the help of aggregate pipeline instead of .create()
+
+    const comment = await Comment.create({
+        content: commentText,
+        video: videoId,
+        owner: req.user._id
+    })
+    
+    // but it return array instead of document
+    // const comment = await Comment.aggregate([
+    //     {
+    //         $match:{
+    //             video: videoId
+    //         }
+    //     },
+    //     {   //it can perform mongo .create() opration crud opration.
+    //         $push:{
+    //             content: commentText,
+    //             video: videoId,
+    //             owner: req.user._id
+    //         }
+    //     }
+    // ])
+
+    return res
+    .status(200)
+    .json(
+        new ApiResponse(
+            200,
+            comment,
+            "comment is added successfully"
+        )
+    )
 })
 
 const updateComment = asyncHandler(async (req, res) => {
