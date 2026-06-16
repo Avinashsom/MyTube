@@ -88,6 +88,41 @@ const addComment = asyncHandler(async (req, res) => {
 
 const updateComment = asyncHandler(async (req, res) => {
     // TODO: update a comment
+    //get commentId
+    //update the comment in db and save
+    //return res
+
+    const {commentId} = req.params
+    if(!commentId){
+        throw new ApiError(400, "authentication is required")
+    }
+
+    const {commentText} = req.body
+    if(!commentText){
+        throw new ApiError(400, "comment text is required")
+    }
+
+    const comment = await Comment.findByIdAndUpdate(
+        commentId,
+        {
+            $set:{
+                content: commentText
+            }
+        },
+        {
+            new:true
+        }
+    )
+
+    return res
+    .status(200)
+    .json(
+        new ApiResponse(
+            200,
+            comment,
+            "comment is updated successfully"
+        )
+    )
 })
 
 const deleteComment = asyncHandler(async (req, res) => {
