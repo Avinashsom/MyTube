@@ -212,6 +212,44 @@ const updatePlaylist = asyncHandler(async (req, res) => {
     const {playlistId} = req.params
     const {name, description} = req.body
     //TODO: update playlist
+    if(!playlistId){
+        throw new ApiError(400, "playlistId is required")
+    }
+    if(!name && !description){
+        throw new ApiError(400, "name or description is required")
+    }
+    //check if user send name only then update name, if user send only description then update description, if user send both then update both
+    //f the client only sends name, then description becomes undefined, and vice versa.
+
+    const updateData= {}
+    if(name) updateData.name= name
+    if(description) updateData.description= description
+
+    const playlist = await Playlist.findOneAndUpdate(
+        {
+            _id: playlistId,
+            owner: req.user_id
+        },{
+            $set: {...updateData}
+        },
+        {
+            new: true,
+            runValidators: true    //it can validate the data before updating like if name is empty or description is empty it will throw error, check minlength of name >3
+        }
+    )
+    if(!playlist){
+        throw new ApiError(404, "playlist is not found")
+    }
+
+    return res
+    .status(200)
+    .json(
+        new ApiResponse(
+            200,
+            playlist,
+            "playlist is updated successfully"
+        )
+    )
 })
 
 export {
