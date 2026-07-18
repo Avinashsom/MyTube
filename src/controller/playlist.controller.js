@@ -228,7 +228,7 @@ const updatePlaylist = asyncHandler(async (req, res) => {
     const playlist = await Playlist.findOneAndUpdate(
         {
             _id: playlistId,
-            owner: req.user_id
+            owner: req.user._id
         },{
             $set: {...updateData}
         },
